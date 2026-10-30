@@ -10,9 +10,13 @@ final class Recorder {
     private var samples: [Float] = []
     private var inputRate: Double = 48_000
     private let converter = AudioConverter(sampleRate: Recorder.sampleRate)
+    private var startedAt = Date()
+    private var firstBufferLogged = false
 
     func start() throws {
         lock.lock(); samples.removeAll(keepingCapacity: true); lock.unlock()
+        startedAt = Date()
+        firstBufferLogged = false
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         inputRate = format.sampleRate
@@ -20,6 +24,10 @@ final class Recorder {
             guard let self, let channel = buffer.floatChannelData?[0] else { return }
             let chunk = UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))
             self.lock.lock(); self.samples.append(contentsOf: chunk); self.lock.unlock()
+            if !self.firstBufferLogged {
+                self.firstBufferLogged = true
+                Log.write("first audio buffer \(Int(Date().timeIntervalSince(self.startedAt) * 1000)) ms after press")
+            }
         }
         engine.prepare()
         try engine.start()
