@@ -29,6 +29,10 @@ One user, Eric: Apple Silicon Mac, macOS 15 (Sequoia) at the time of writing, Xc
 
 Several menu-bar dictation apps already combine these engines; read how they do the hotkey, the paste and the engine switch rather than reinventing it: Hex (dizk/Hex), MacParakeet (moona3k), Ghost Pepper (matthartman), Muesli (forjd), Voicey (jonathanKingston), wispr (sebsto), digimata/quill (a meeting recorder that shares the name). Verify each before relying on it.
 
+## Decisions made
+
+1. **Shape (10/30): native Swift menu-bar app.** SwiftUI `MenuBarExtra`, SwiftPM, no Dock icon, signed with Eric's Developer ID so the Accessibility grant survives rebuilds.
+
 ## Name collision
 
 Other projects are called Quill, including an open-source macOS voice-typing app and digimata/quill. Fine for a personal tool; revisit only if this is ever shared.
