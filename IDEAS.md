@@ -6,3 +6,6 @@
 - 10/30 — a toggle mode for long dictation (double-tap Right Option locks recording on, as Hex does).
 - 10/30 — a short in-memory history of recent transcripts in the menu, beyond the last one.
 - 10/30 — when a held transcript is waiting, paste it on the next return to the original app (or a key), instead of only from the menu.
+- 10/30 — a click mid-dictation must never throw the audio away ("another thing popped up and I had to click a mouse while I was dictating"). Fixed the same evening: a cancel only in the first 0.5 s.
+- 10/30 — real-time dictation: see the words as they're spoken, not only after release (FluidAudio's streaming managers: SlidingWindowAsrManager, StreamingEouAsrManager).
+- 10/30 — an indicator at the cursor or the text location while listening, so he can see where the words will land (Accessibility: the focused element's caret bounds; fall back near the mouse for apps that don't expose it).
