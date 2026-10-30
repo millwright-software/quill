@@ -32,6 +32,9 @@ Several menu-bar dictation apps already combine these engines; read how they do 
 ## Decisions made
 
 1. **Shape (10/30): native Swift menu-bar app.** SwiftUI `MenuBarExtra`, SwiftPM, no Dock icon, signed with Eric's Developer ID so the Accessibility grant survives rebuilds.
+2. **Engine (10/30): FluidAudio Parakeet TDT v2 (English).** Eric's criterion: the most accurate. Parakeet v2's model card reports 6.05% average WER on the Open ASR leaderboard's 8 English sets; Whisper large-v3-turbo is ~7.8% from memory (the leaderboard CSV is login-gated, unverified). It is also the faster one. WhisperKit turbo as a second engine, compared on Eric's own voice, is in IDEAS. FluidAudio v0.18.0 (10/28): every `transcribe` overload takes `decoderState: inout` (the README is stale).
+3. **Hotkey (10/30): hold Right Option** (keycode 61), via a CGEventTap. Hex's rules: a hold under 0.3 s is discarded; any other key or a mouse click during the hold cancels. Hold-to-talk only in v0.1.
+4. **Recordings (10/30): never on disk; kept in memory until the paste is confirmed** (Eric: in MacWhisper, "if something grabs the screen focus while I'm transcribing… I lose the audio because it doesn't have anywhere to paste it"). The app frontmost at key-press is the paste target. If another app is frontmost when the text is ready, Quill does not paste: it holds the transcript, marks the icon, and the menu offers Paste / Copy / Re-transcribe. The last clip and text stay in memory until the next dictation pastes. "Confirmed" means Cmd-V went to the same app; macOS cannot confirm that a paste landed, so the menu copy is the backstop.
 
 ## Name collision
 
