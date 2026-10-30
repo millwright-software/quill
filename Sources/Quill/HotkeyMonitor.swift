@@ -2,7 +2,9 @@ import CoreGraphics
 import Foundation
 
 /// Watches for Right Option held alone, through a session event tap.
-/// Any other key, modifier or mouse click during the hold cancels it (Hex's rule).
+/// Another key, modifier or mouse click in the first half second cancels it (an Option chord, not
+/// dictation). After that the hold is committed: nothing but releasing the key ends it, so a click
+/// or keystroke mid-dictation never throws the audio away (a 13.7 s dictation was lost that way 10/30).
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
@@ -12,7 +14,16 @@ final class HotkeyMonitor {
     private static let rightOptionDeviceMask: UInt64 = 0x40   // NX_DEVICERALTKEYMASK
 
     private var tap: CFMachPort?
+    private static let cancelWindow: TimeInterval = 0.5
+
     private var holding = false
+    private var pressedAt = Date()
+
+    private func cancelIfEarly() {
+        guard holding, Date().timeIntervalSince(pressedAt) < Self.cancelWindow else { return }
+        holding = false
+        onCancel?()
+    }
 
     func start() -> Bool {
         let types: [CGEventType] = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
@@ -46,20 +57,17 @@ final class HotkeyMonitor {
                 let down = event.flags.rawValue & Self.rightOptionDeviceMask != 0
                 if down && !holding {
                     holding = true
+                    pressedAt = Date()
                     onPress?()
                 } else if !down && holding {
                     holding = false
                     onRelease?()
                 }
-            } else if holding {
-                holding = false
-                onCancel?()
+            } else {
+                cancelIfEarly()
             }
         case .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown:
-            if holding {
-                holding = false
-                onCancel?()
-            }
+            cancelIfEarly()
         default:
             break
         }

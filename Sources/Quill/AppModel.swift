@@ -114,7 +114,7 @@ final class AppModel: ObservableObject {
         guard state == .listening else { return }
         _ = recorder.stop()
         state = lastText != nil && lastWasHeld ? .held : .idle
-        Log.write("cancelled (another key or a click during the hold)")
+        Log.write("cancelled (another key or a click in the first 0.5 s)")
     }
 
     private var lastWasHeld = false
