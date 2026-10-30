@@ -7,7 +7,7 @@ enum Paster {
     private static let vKeyCode: CGKeyCode = 9
 
     @MainActor
-    static func paste(_ text: String) async {
+    static func paste(_ text: String) {
         let pasteboard = NSPasteboard.general
         let saved = snapshot(pasteboard)
 
@@ -21,11 +21,14 @@ enum Paster {
 
         postCommandV()
 
-        try? await Task.sleep(for: restoreDelay)
-        // Only restore if nothing else has written to the clipboard since.
-        if pasteboard.changeCount == ours {
-            pasteboard.clearContents()
-            if !saved.isEmpty { pasteboard.writeObjects(saved) }
+        // Returns once Cmd-V is posted; the clipboard comes back in the background.
+        Task { @MainActor in
+            try? await Task.sleep(for: restoreDelay)
+            // Only restore if nothing else has written to the clipboard since.
+            if pasteboard.changeCount == ours {
+                pasteboard.clearContents()
+                if !saved.isEmpty { pasteboard.writeObjects(saved) }
+            }
         }
     }
 

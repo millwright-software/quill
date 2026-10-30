@@ -150,12 +150,12 @@ final class AppModel: ObservableObject {
                 lastText = text
                 let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
                 if let target, front == target {
-                    await Paster.paste(text)
+                    Paster.paste(text)
                     let tPaste = ms(since: startedAt)
                     lastWasHeld = false
                     lastAudio = nil   // confirmed: Cmd-V went to the app it was meant for
-                    lastTiming = "Last: \(tText) ms to text, \(tPaste) ms to paste"
-                    Log.write("pasted into \(appName(front)): \(tText) ms to text, \(tPaste) ms to paste, \(text.count) chars")
+                    lastTiming = "Last: \(tText) ms to text, \(tPaste) ms to Cmd-V"
+                    Log.write("pasted into \(appName(front)): \(tText) ms to text, \(tPaste) ms to Cmd-V, \(text.count) chars")
                     state = .idle
                 } else {
                     lastWasHeld = true
@@ -178,7 +178,7 @@ final class AppModel: ObservableObject {
         Task {
             // Let the menu close so the paste lands in the app underneath.
             try? await Task.sleep(for: .milliseconds(250))
-            await Paster.paste(text)
+            Paster.paste(text)
             lastWasHeld = false
             lastAudio = nil
             state = .idle
