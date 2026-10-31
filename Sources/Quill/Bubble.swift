@@ -55,11 +55,11 @@ final class Bubble {
             // is too long, drop the words that haven't entered yet: the tape shows what's current.
             if tapeEnd - tape > Self.maxLag {
                 words.removeAll { $0.start > tape }
-                tapeEnd = tape
+                tapeEnd = max(tape, words.last?.end ?? tape)   // after a word that's partly in view
             }
             let width = (text as NSString).size(withAttributes: [.font: Self.font]).width
             let start = max(tapeEnd, tape)   // after the last word, or at the right edge after a pause
-            words.append(Word(id: nextID, text: text, start: start))
+            words.append(Word(id: nextID, text: text, start: start, end: start + width + Self.space))
             nextID += 1
             tapeEnd = start + width + Self.space
         }
@@ -75,6 +75,7 @@ final class Bubble {
         let id: Int
         let text: String
         let start: CGFloat
+        let end: CGFloat
     }
 
     enum Status { case listening, transcribing, held }
