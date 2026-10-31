@@ -13,7 +13,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Quill "$APP/Contents/MacOS/Quill"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-cp Resources/AppIcon.icns Resources/menubar/*.png "$APP/Contents/Resources/"
+cp Resources/AppIcon.icns Resources/quill-bubble.png Resources/menubar/*.png "$APP/Contents/Resources/"
 codesign --force --options runtime --timestamp=none \
   --entitlements Resources/Quill.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"

@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
 // Draws Quill's icons with CoreGraphics. Run from the repo root: swift scripts/make-icons.swift
-// Writes Resources/menubar/quill-<state>{,@2x}.png (template, black on clear),
+// Writes Resources/menubar/quill-<state>{,@2x}.png (template, black on clear), Resources/quill-bubble.png,
 // Resources/AppIcon.icns, and Resources/icon-preview.png.
 import AppKit
 import CoreGraphics
@@ -114,6 +114,22 @@ func renderMark(_ s: State, px: Int) -> CGImage {
     drawMark(s, in: c)
     return c.makeImage()!
 }
+
+// The bubble's feather: the same silhouette, filled, plain, drawn large (32 pt at 3x).
+func renderBubbleFeather(px: Int) -> CGImage {
+    let c = makeContext(px, px)
+    c.scaleBy(x: CGFloat(px) / 18, y: CGFloat(px) / 18)
+    c.setFillColor(CGColor(gray: 0, alpha: 1)); c.setStrokeColor(CGColor(gray: 0, alpha: 1))
+    c.setLineCap(.round)
+    let f = Feather(L: 16.5, w: 3.0), origin = CGPoint(x: 2.6, y: 2.6), ang = CGFloat.pi / 4
+    c.addPath(place(f.vane, at: origin, angle: ang)); c.fillPath()
+    c.setBlendMode(.clear); c.setLineWidth(0.8)
+    c.addPath(place(f.line(0.2, 0.88), at: origin, angle: ang)); c.strokePath()
+    c.setBlendMode(.normal); c.setLineWidth(1.6)
+    c.addPath(place(f.line(-0.02, 0.2), at: origin, angle: ang)); c.strokePath()
+    return c.makeImage()!
+}
+writePNG(renderBubbleFeather(px: 96), to: root + "/Resources/quill-bubble.png", pointSize: CGSize(width: 32, height: 32))
 
 for s in State.allCases {
     writePNG(renderMark(s, px: 18), to: "\(menubarDir)/quill-\(s.rawValue).png", pointSize: CGSize(width: 18, height: 18))

@@ -155,22 +155,36 @@ final class Bubble {
 private struct BubbleView: View {
     @ObservedObject var model: Bubble.Model
 
+    static let feather: Image = {
+        if let image = NSImage(named: "quill-bubble") { image.isTemplate = true; return Image(nsImage: image) }
+        return Image(nsImage: NSApp.applicationIconImage)
+    }()
+
     var body: some View {
         HStack(spacing: 8) {
-            // Driven by the clock, not implicit animation, so nothing in the layout ever moves.
+            // The feather writing: slowly back and forth along a faint baseline, tilting a little at
+            // each turn. Driven by the clock, not implicit animation, so the layout never moves.
             TimelineView(.animation(paused: model.status != .listening)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
-                let listening = model.status == .listening
-                let glow = listening ? (sin(t * 2 * .pi / 1.6) + 1) / 2 : 0   // a slow breath
-                let nib = listening ? sin(t * 2 * .pi * 2.2) * 3 : 0           // a small writing stroke, in degrees
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .frame(width: 28, height: 28)
-                    .rotationEffect(.degrees(nib), anchor: .bottomLeading)
-                    .shadow(color: Color(red: 0.55, green: 0.75, blue: 1).opacity(0.35 + 0.5 * glow), radius: 2 + 5 * glow)
-                    .opacity(model.status == .transcribing ? 0.6 : 1)
+                let phase = model.status == .listening ? sin(t * 2 * .pi / 2.4) : 0   // one pass = 1.2 s
+                ZStack(alignment: .bottomLeading) {
+                    Capsule()
+                        .fill(.secondary.opacity(0.35))
+                        .frame(width: 30, height: 1.5)
+                        .offset(x: 2, y: -2)
+                    Self.feather
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.primary)
+                        .frame(width: 24, height: 24)
+                        .rotationEffect(.degrees(-4 * cos(t * 2 * .pi / 2.4) * (model.status == .listening ? 1 : 0)),
+                                        anchor: .bottomLeading)
+                        .offset(x: 4 + 6 * phase, y: -2)
+                        .opacity(model.status == .transcribing ? 0.5 : 1)
+                }
+                .frame(width: 40, height: 28, alignment: .bottomLeading)
             }
-            .frame(width: 28, height: 28)
+            .frame(width: 40, height: 28)
             if !line.isEmpty {
                 // One line; the newest words stay in view and older ones slide off the left.
                 Text(line)
