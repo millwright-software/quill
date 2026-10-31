@@ -5,41 +5,87 @@ import SwiftUI
 /// A small floating bubble at the text cursor while listening: the live words and where they'll go.
 @MainActor
 final class Bubble {
+    /// The live words as a ticker tape running right to left at a steady pace. A word joins the
+    /// tape once two live passes agree on it (a moving word can't be taken back), enters at the right
+    /// edge, and fades out at the left. A pause in speech is a gap on the tape.
     final class Model: ObservableObject {
         @Published var target = ""
-        @Published var words: [Word] = []
         @Published var status: Status = .listening
+        @Published private(set) var words: [Word] = []
+        /// How far the tape has run, in points; a word's x is `width - (tape - word.start)`.
+        @Published private(set) var tape: CGFloat = 0
+
+        static let width: CGFloat = 380
+        static let font = NSFont.preferredFont(forTextStyle: .callout)
+        private static let space: CGFloat = 5
+        private static let baseSpeed: CGFloat = 60      // points per second when nothing is waiting
+        private static let catchUp: CGFloat = 1.5       // extra speed per point of words still waiting
+
+        private var tapeEnd: CGFloat = 0
+        private var emitted = 0
+        private var lastPartial: [String] = []
         private var nextID = 0
 
-        /// Keeps the words the new text agrees with, so only a revised tail fades out and back in.
+        func reset() {
+            words = []; tape = 0; tapeEnd = 0; emitted = 0; lastPartial = []
+        }
+
+        /// A new live pass: put on the tape the words this pass and the last one agree on.
         func set(text: String) {
             let incoming = text.split(separator: " ").map(String.init)
-            var keep = 0
-            while keep < words.count, keep < incoming.count, words[keep].text == incoming[keep] { keep += 1 }
-            words.removeLast(words.count - keep)
-            for word in incoming[keep...] {
-                words.append(Word(id: nextID, text: word))
-                nextID += 1
+            var stable = 0
+            while stable < incoming.count, stable < lastPartial.count, incoming[stable] == lastPartial[stable] { stable += 1 }
+            lastPartial = incoming
+            if stable > emitted {
+                for word in incoming[emitted..<stable] { enqueue(word) }
+                emitted = stable
             }
+        }
+
+        /// The key is up: whatever the last pass heard goes on the tape too.
+        func flush() {
+            if lastPartial.count > emitted {
+                for word in lastPartial[emitted...] { enqueue(word) }
+                emitted = lastPartial.count
+            }
+        }
+
+        private func enqueue(_ text: String) {
+            let width = (text as NSString).size(withAttributes: [.font: Self.font]).width
+            let start = max(tapeEnd, tape)   // after the last word, or at the right edge after a pause
+            words.append(Word(id: nextID, text: text, start: start))
+            nextID += 1
+            tapeEnd = start + width + Self.space
+        }
+
+        func advance(by seconds: CGFloat) {
+            let waiting = max(0, tapeEnd - tape)
+            tape += (Self.baseSpeed + Self.catchUp * waiting) * seconds
+            // Drop words well past the left edge.
+            words.removeAll { Self.width - (tape - $0.start) < -200 }
         }
     }
 
-    struct Word: Identifiable, Equatable {
+    struct Word: Identifiable {
         let id: Int
         let text: String
+        let start: CGFloat
     }
 
     enum Status { case listening, transcribing, held }
 
     private let model = Model()
     private var panel: NSPanel?
+    private var ticker: Timer?
+    private var lastTick = CACurrentMediaTime()
     private var hideTask: Task<Void, Never>?
 
     func show(target: String) {
         hideTask?.cancel()
         model.target = target
-        model.words = []
+        model.reset()
         model.status = .listening
+        startTicker()
         let panel = self.panel ?? makePanel()
         self.panel = panel
         place(panel)
@@ -48,10 +94,28 @@ final class Bubble {
     }
 
     func update(text: String) {
-        withAnimation(.easeOut(duration: 0.6)) { model.set(text: text) }
+        model.set(text: text)
     }
 
-    func transcribing() { model.status = .transcribing }
+    func transcribing() {
+        model.status = .transcribing
+        model.flush()
+    }
+
+    private func startTicker() {
+        ticker?.invalidate()
+        lastTick = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let now = CACurrentMediaTime()
+                self.model.advance(by: CGFloat(now - self.lastTick))
+                self.lastTick = now
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        ticker = timer
+    }
 
     func held() {
         model.status = .held
@@ -65,6 +129,8 @@ final class Bubble {
             if delay > .zero { try? await Task.sleep(for: delay) }
             guard !Task.isCancelled else { return }
             self?.panel?.orderOut(nil)
+            self?.ticker?.invalidate()
+            self?.ticker = nil
         }
     }
 
@@ -223,31 +289,31 @@ private struct BubbleView: View {
     static let glow = Color(red: 0.55, green: 0.75, blue: 1)
     static let glowRoom: CGFloat = 18
 
-    /// The words in soft grey, newest at the right: each fades in from the right, the line glides
-    /// left as it grows, and older words fade out at the left edge.
+    /// The tape: soft grey words entering at the right edge and fading out at the left.
     @ViewBuilder private var stream: some View {
+        let width = Bubble.Model.width
         if model.status == .held {
             Text("Held: focus left \(model.target), not pasted. Quill menu → Paste or Copy.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 380, alignment: .leading)
+                .frame(width: width, alignment: .leading)
         } else {
-            HStack(spacing: 4) {
-                ForEach(model.words.suffix(40)) { word in
+            ZStack(alignment: .leading) {
+                ForEach(model.words) { word in
                     Text(word.text)
-                        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 14)),
-                                                removal: .opacity))
+                        .font(Font(Bubble.Model.font))
+                        .fixedSize()
+                        .offset(x: width - (model.tape - word.start))
                 }
             }
-            .font(.callout)
             .foregroundStyle(.secondary)
-            .fixedSize()
-            .frame(width: 380, height: 20, alignment: .trailing)
+            .frame(width: width, height: 20, alignment: .leading)
             .clipped()
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0),
-                                         .init(color: .black, location: 0.35),
-                                         .init(color: .black, location: 1)],
+                                         .init(color: .black, location: 0.3),
+                                         .init(color: .black, location: 0.9),
+                                         .init(color: .clear, location: 1)],
                                  startPoint: .leading, endPoint: .trailing))
         }
     }

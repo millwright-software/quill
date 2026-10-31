@@ -217,13 +217,13 @@ final class AppModel: ObservableObject {
 
     // MARK: Live text
 
-    /// While the key is held, re-transcribe the capture so far about every 0.6 s and show it in the
+    /// While the key is held, re-transcribe the capture so far about every 0.4 s and show it in the
     /// bubble. A rough draft: the paste comes from one full pass on release.
     private func startLiveText() {
         liveTask?.cancel()
         liveTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(600))
+                try? await Task.sleep(for: .milliseconds(400))
                 guard let self, !Task.isCancelled, self.state == .listening else { return }
                 let audio = self.recorder.snapshot(lastSeconds: 20)
                 guard audio.count > Int(Recorder.sampleRate * 0.4) else { continue }
