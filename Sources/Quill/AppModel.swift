@@ -39,11 +39,17 @@ final class AppModel: ObservableObject {
     @Published var lastTiming: String?
     @Published var accessibilityTrusted = false
     @Published var microphoneGranted = false
+    /// Live words in the bubble while holding; off = the bubble shows only where the paste will go.
+    @Published var livePreview = UserDefaults.standard.object(forKey: "livePreview") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(livePreview, forKey: "livePreview") }
+    }
 
     /// The last clip, kept in memory until its transcript is pasted into the app it was meant for.
     private(set) var lastAudio: [Float]?
 
     private let recorder = Recorder()
+    private let bubble = Bubble()
+    private var liveTask: Task<Void, Never>?
     private let transcriber = Transcriber()
     private var hotkey: HotkeyMonitor?
     private var targetPID: pid_t?
@@ -57,6 +63,10 @@ final class AppModel: ObservableObject {
 
     private func start() async {
         microphoneGranted = await Permissions.requestMicrophone()
+        if microphoneGranted {
+            do { try recorder.warmUp(); Log.write("mic warm") }
+            catch { Log.write("mic warm-up failed: \(error)") }
+        }
         accessibilityTrusted = Permissions.accessibility(prompt: true)
         startHotkeyWhenTrusted()
 
@@ -103,6 +113,8 @@ final class AppModel: ObservableObject {
         do {
             try recorder.start()
             state = .listening
+            bubble.show(target: appName(targetPID))
+            if livePreview { startLiveText() }
             Log.write("press: recording (start took \(ms(since: pressedAt!)) ms), target \(appName(targetPID))")
         } catch {
             Log.write("recorder start failed: \(error)")
@@ -112,6 +124,8 @@ final class AppModel: ObservableObject {
 
     private func cancel() {
         guard state == .listening else { return }
+        stopLiveText()
+        bubble.hide()
         _ = recorder.stop()
         state = lastText != nil && lastWasHeld ? .held : .idle
         Log.write("cancelled (another key or a click in the first 0.5 s)")
@@ -121,9 +135,11 @@ final class AppModel: ObservableObject {
 
     private func release() {
         guard state == .listening, let pressedAt else { return }
+        stopLiveText()
         let samples = recorder.stop()
         let held = Date().timeIntervalSince(pressedAt)
         if held < 0.3 {
+            bubble.hide()
             state = lastWasHeld ? .held : .idle
             Log.write("tap under 0.3 s, discarded")
             return
@@ -137,6 +153,7 @@ final class AppModel: ObservableObject {
 
     private func transcribeAndPaste(_ samples: [Float], target: pid_t?) {
         state = .transcribing
+        bubble.transcribing()
         let startedAt = releasedAt ?? Date()
         Task {
             do {
@@ -144,10 +161,12 @@ final class AppModel: ObservableObject {
                 let tText = ms(since: startedAt)
                 guard !text.isEmpty else {
                     Log.write("empty transcript after \(tText) ms")
+                    bubble.hide()
                     state = .idle
                     return
                 }
                 lastText = text
+                bubble.update(text: text)
                 let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
                 if let target, front == target {
                     Paster.paste(text)
@@ -157,18 +176,46 @@ final class AppModel: ObservableObject {
                     lastTiming = "Last: \(tText) ms to text, \(tPaste) ms to Cmd-V"
                     Log.write("pasted into \(appName(front)): \(tText) ms to text, \(tPaste) ms to Cmd-V, \(text.count) chars")
                     state = .idle
+                    bubble.hide()
                 } else {
                     lastWasHeld = true
                     lastTiming = "Last: \(tText) ms to text (held)"
                     Log.write("HELD: target \(appName(target)) but front is \(appName(front)); not pasted, \(text.count) chars")
                     state = .held
+                    bubble.held()
                     NSSound.beep()
                 }
             } catch {
                 Log.write("transcription failed: \(error)")
                 state = .failed("transcription: \(error.localizedDescription)")
+                bubble.hide()
             }
         }
+    }
+
+    // MARK: Live text
+
+    /// While the key is held, re-transcribe the capture so far about every 0.6 s and show it in the
+    /// bubble. A rough draft: the paste comes from one full pass on release.
+    private func startLiveText() {
+        liveTask?.cancel()
+        liveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(600))
+                guard let self, !Task.isCancelled, self.state == .listening else { return }
+                let audio = self.recorder.snapshot(lastSeconds: 20)
+                guard audio.count > Int(Recorder.sampleRate * 0.4) else { continue }
+                if let text = try? await self.transcriber.transcribe(audio),
+                   !Task.isCancelled, self.state == .listening, !text.isEmpty {
+                    self.bubble.update(text: text)
+                }
+            }
+        }
+    }
+
+    private func stopLiveText() {
+        liveTask?.cancel()
+        liveTask = nil
     }
 
     // MARK: Menu

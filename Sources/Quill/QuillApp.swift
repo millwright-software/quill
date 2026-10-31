@@ -33,6 +33,7 @@ struct MenuContent: View {
         if let text = model.lastText {
             Text(text.count > 60 ? String(text.prefix(60)) + "…" : text)
         }
+        Toggle("Live Preview While Talking", isOn: $model.livePreview)
         Divider()
         if !model.accessibilityTrusted {
             Button("Grant Accessibility…") { Permissions.openAccessibilitySettings() }

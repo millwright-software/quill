@@ -9,3 +9,4 @@
 - 10/30 — a click mid-dictation must never throw the audio away ("another thing popped up and I had to click a mouse while I was dictating"). Fixed the same evening: a cancel only in the first 0.5 s.
 - 10/30 — real-time dictation: see the words as they're spoken, not only after release (FluidAudio's streaming managers: SlidingWindowAsrManager, StreamingEouAsrManager).
 - 10/30 — an indicator at the cursor or the text location while listening, so he can see where the words will land (Accessibility: the focused element's caret bounds; fall back near the mouse for apps that don't expose it).
+- 10/30 — live vs. one blob: "I don't know if I want an option to have it live transcribe or just paste one blob at the end." v0.2 shows the live words in the bubble and pastes one blob on release, with a menu toggle for the live preview. Typing the live words straight into the field is a possible third mode, after he has lived with the bubble.
