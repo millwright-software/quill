@@ -15,13 +15,11 @@ final class Bubble {
         /// How far the tape has run, in points; a word's x is `width - (tape - word.start)`.
         @Published private(set) var tape: CGFloat = 0
 
-        static let width: CGFloat = 170                 // about the last three or four words
+        static let width: CGFloat = 130                 // the last few words
         static let font = NSFont.preferredFont(forTextStyle: .callout)
         private static let space: CGFloat = 5
-        private static let baseSpeed: CGFloat = 45      // points per second when nothing is waiting
-        private static let catchUp: CGFloat = 1.0       // extra speed per point of words still waiting
-        private static let easing: CGFloat = 0.8        // seconds for the speed to settle; no lurches
-        private var speed: CGFloat = baseSpeed
+        private static let speed: CGFloat = 60          // points per second, constant (Eric 10/31)
+        private static let maxLag: CGFloat = 90         // words waiting beyond this are skipped, to stay current
 
         private var tapeEnd: CGFloat = 0
         private var emitted = 0
@@ -29,7 +27,7 @@ final class Bubble {
         private var nextID = 0
 
         func reset() {
-            words = []; tape = 0; tapeEnd = 0; emitted = 0; lastPartial = []; speed = Self.baseSpeed
+            words = []; tape = 0; tapeEnd = 0; emitted = 0; lastPartial = []
         }
 
         /// A new live pass: put on the tape the words this pass and the last one agree on.
@@ -53,6 +51,12 @@ final class Bubble {
         }
 
         private func enqueue(_ text: String) {
+            // At a constant pace, fast speech would fall further and further behind. If the queue
+            // is too long, drop the words that haven't entered yet: the tape shows what's current.
+            if tapeEnd - tape > Self.maxLag {
+                words.removeAll { $0.start > tape }
+                tapeEnd = tape
+            }
             let width = (text as NSString).size(withAttributes: [.font: Self.font]).width
             let start = max(tapeEnd, tape)   // after the last word, or at the right edge after a pause
             words.append(Word(id: nextID, text: text, start: start))
@@ -61,10 +65,7 @@ final class Bubble {
         }
 
         func advance(by seconds: CGFloat) {
-            let waiting = max(0, tapeEnd - tape)
-            let target = Self.baseSpeed + Self.catchUp * waiting
-            speed += (target - speed) * min(1, seconds / Self.easing)
-            tape += speed * seconds
+            tape += Self.speed * seconds
             // Drop words well past the left edge.
             words.removeAll { Self.width - (tape - $0.start) < -200 }
         }
