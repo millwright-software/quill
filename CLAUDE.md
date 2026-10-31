@@ -38,6 +38,12 @@ Several menu-bar dictation apps already combine these engines; read how they do 
 5. **Warm mic (10/30, Eric: yes).** The mic stays open while Quill runs, with a 0.5 s rolling pre-roll in memory, so a press starts with the audio just before it. Cold starts took 280–720 ms to deliver the first buffer and cut the first words. The cost: macOS's orange mic dot stays on.
 6. **The bubble (v0.2, 10/30).** A floating panel just below the text cursor (Accessibility caret bounds; else below the focused field; else by the mouse) shows "Listening → <app>", the live words (the capture re-transcribed every ~0.6 s, a rough draft), then "Writing", or "Held" when focus left the target. The paste is still one full pass on release. Live preview is a menu toggle.
 
+## Next: meeting mode (v0.3, decided 10/30, build next session)
+
+Feature 2 grown into meetings, from the menu. **Menu → Start Meeting**: the icon changes to a record mark, and a small window shows the live transcript (the same rough-draft re-transcription as the bubble). **Stop**: the icon shows transcribing, then a full pass with speaker labels (FluidAudio's `Diarizer` trait, off since v0.1; renameable Speaker 1/2…), opened in a window with Copy and Save.
+- **Sources: both, like MacWhisper (Eric).** He records Zoom calls in MacWhisper without picking the Zoom app, and sometimes puts his phone on speakerphone next to the laptop. So: the mic always (it covers in-person and the speakerphone), plus the Mac's audio output when there is any (system audio capture: a Core Audio process tap or ScreenCaptureKit, needing the Screen & System Audio Recording permission). Two tracks, mic and system, also help label who spoke. Check how MacWhisper and the prior art capture system audio before choosing the API.
+- **Saving: the Desktop by default (Eric).** Audio and transcript side by side, dated; the folder changeable later. Dictation clips stay memory-only (decision 4).
+
 ## Name collision
 
 Other projects are called Quill, including an open-source macOS voice-typing app and digimata/quill. Fine for a personal tool; revisit only if this is ever shared.
