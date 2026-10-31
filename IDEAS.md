@@ -4,7 +4,7 @@
 - 10/30 — engine: "whichever one is the most accurate." Add WhisperKit large-v3-turbo as a switch and compare it with Parakeet v2 on Eric's own dictation; let his voice settle it, not the leaderboard.
 - 10/30 — never lose a dictation to a focus grab (MacWhisper's worst habit): hold the text when the target app lost focus, keep it until it is pasted. (In v0.1 as decision 4.)
 - 10/30 — a toggle mode for long dictation (double-tap Right Option locks recording on, as Hex does).
-- 10/30 — a short in-memory history of recent transcripts in the menu, beyond the last one.
+- 10/30 — a short in-memory history of recent transcripts in the menu, beyond the last one. **Declined 10/31** (Eric: "I don't want history. I just like having the most recent… in the memory of the app in case something steals the focus"): the last one, in memory, is the design.
 - 10/30 — when a held transcript is waiting, paste it on the next return to the original app (or a key), instead of only from the menu.
 - 10/30 — a click mid-dictation must never throw the audio away ("another thing popped up and I had to click a mouse while I was dictating"). Fixed the same evening: a cancel only in the first 0.5 s.
 - 10/30 — real-time dictation: see the words as they're spoken, not only after release (FluidAudio's streaming managers: SlidingWindowAsrManager, StreamingEouAsrManager).
