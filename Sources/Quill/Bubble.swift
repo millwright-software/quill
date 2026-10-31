@@ -42,14 +42,6 @@ final class Bubble {
             }
         }
 
-        /// The key is up: whatever the last pass heard goes on the tape too.
-        func flush() {
-            if lastPartial.count > emitted {
-                for word in lastPartial[emitted...] { enqueue(word) }
-                emitted = lastPartial.count
-            }
-        }
-
         private func enqueue(_ text: String) {
             // At a constant pace, fast speech would fall further and further behind. If the queue
             // is too long, drop the words that haven't entered yet: the tape shows what's current.
@@ -104,13 +96,14 @@ final class Bubble {
         startTicker()   // needs the panel's view for its display link
     }
 
+    /// Live words only while the key is held; once it's up the tape just drifts and fades.
     func update(text: String) {
+        guard model.status == .listening else { return }
         model.set(text: text)
     }
 
     func transcribing() {
         model.status = .transcribing
-        model.flush()
     }
 
     /// Steps the tape once per screen refresh (a timer drifts against the display and judders).
@@ -130,7 +123,7 @@ final class Bubble {
         hide(after: .seconds(5))
     }
 
-    private static let fadeOut: TimeInterval = 0.6
+    private static let fadeOut: TimeInterval = 1.4
 
     func hide(after delay: Duration = .zero) {
         hideTask?.cancel()
@@ -140,6 +133,7 @@ final class Bubble {
             // Fade out, the words still drifting, rather than vanish.
             await NSAnimationContext.runAnimationGroup { context in
                 context.duration = Self.fadeOut
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().alphaValue = 0
             }
             guard !Task.isCancelled else { return }
