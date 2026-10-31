@@ -7,8 +7,26 @@ import SwiftUI
 final class Bubble {
     final class Model: ObservableObject {
         @Published var target = ""
-        @Published var text = ""
+        @Published var words: [Word] = []
         @Published var status: Status = .listening
+        private var nextID = 0
+
+        /// Keeps the words the new text agrees with, so only a revised tail fades out and back in.
+        func set(text: String) {
+            let incoming = text.split(separator: " ").map(String.init)
+            var keep = 0
+            while keep < words.count, keep < incoming.count, words[keep].text == incoming[keep] { keep += 1 }
+            words.removeLast(words.count - keep)
+            for word in incoming[keep...] {
+                words.append(Word(id: nextID, text: word))
+                nextID += 1
+            }
+        }
+    }
+
+    struct Word: Identifiable, Equatable {
+        let id: Int
+        let text: String
     }
 
     enum Status { case listening, transcribing, held }
@@ -20,7 +38,7 @@ final class Bubble {
     func show(target: String) {
         hideTask?.cancel()
         model.target = target
-        model.text = ""
+        model.words = []
         model.status = .listening
         let panel = self.panel ?? makePanel()
         self.panel = panel
@@ -30,8 +48,7 @@ final class Bubble {
     }
 
     func update(text: String) {
-        model.text = text
-        resize()
+        withAnimation(.easeOut(duration: 0.6)) { model.set(text: text) }
     }
 
     func transcribing() { model.status = .transcribing }
@@ -63,7 +80,7 @@ final class Bubble {
         panel.level = .statusBar
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = false   // the capsule draws its own glow
         panel.ignoresMouseEvents = true
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -90,17 +107,18 @@ final class Bubble {
         let anchor = Self.caretRect() ?? Self.focusedElementRect()
         let size = panel.contentView?.fittingSize ?? panel.frame.size
         var origin: NSPoint
+        let room = BubbleView.glowRoom   // the transparent margin that holds the glow
         if let anchor {
-            origin = NSPoint(x: anchor.minX, y: anchor.minY - size.height - 6)
+            origin = NSPoint(x: anchor.minX - room, y: anchor.minY - size.height - 6 + room)
         } else {
             let mouse = NSEvent.mouseLocation
-            origin = NSPoint(x: mouse.x + 12, y: mouse.y - size.height - 12)
+            origin = NSPoint(x: mouse.x + 12 - room, y: mouse.y - size.height - 12 + room)
         }
         // Keep it on screen.
         if let screen = NSScreen.screens.first(where: { $0.frame.contains(origin) }) ?? NSScreen.main {
             let v = screen.visibleFrame
             origin.x = min(max(origin.x, v.minX + 4), v.maxX - size.width - 4)
-            if origin.y < v.minY + 4, let anchor { origin.y = anchor.maxY + 6 }   // flip above the caret
+            if origin.y + room < v.minY + 4, let anchor { origin.y = anchor.maxY + 6 - room }   // flip above the caret
             origin.y = min(max(origin.y, v.minY + 4), v.maxY - size.height - 4)
         }
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
@@ -185,24 +203,52 @@ private struct BubbleView: View {
                 .frame(width: 40, height: 28, alignment: .bottomLeading)
             }
             .frame(width: 40, height: 28)
-            if !line.isEmpty {
-                // One line; the newest words stay in view and older ones slide off the left.
-                Text(line)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-                    .foregroundStyle(model.status == .held ? .secondary : .primary)
-                    .frame(width: 380, alignment: .leading)
-            }
+            stream
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 8)
+        .padding(.trailing, 14)
         .padding(.vertical, 6)
         .background(.regularMaterial, in: Capsule())
+        .overlay(
+            Capsule().strokeBorder(
+                LinearGradient(colors: [Self.glow.opacity(0.9), Self.glow.opacity(0.35)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                lineWidth: 1.2)
+        )
+        .shadow(color: Self.glow.opacity(0.55), radius: 8)
+        .shadow(color: Self.glow.opacity(0.25), radius: 16)
+        .padding(Self.glowRoom)   // room inside the panel so the glow isn't clipped
     }
 
-    private var line: String {
-        model.status == .held
-            ? "Held: focus left \(model.target), not pasted. Quill menu → Paste or Copy."
-            : model.text
+    static let glow = Color(red: 0.55, green: 0.75, blue: 1)
+    static let glowRoom: CGFloat = 18
+
+    /// The words in soft grey, newest at the right: each fades in from the right, the line glides
+    /// left as it grows, and older words fade out at the left edge.
+    @ViewBuilder private var stream: some View {
+        if model.status == .held {
+            Text("Held: focus left \(model.target), not pasted. Quill menu → Paste or Copy.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 380, alignment: .leading)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(model.words.suffix(40)) { word in
+                    Text(word.text)
+                        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 14)),
+                                                removal: .opacity))
+                }
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize()
+            .frame(width: 380, height: 20, alignment: .trailing)
+            .clipped()
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0),
+                                         .init(color: .black, location: 0.35),
+                                         .init(color: .black, location: 1)],
+                                 startPoint: .leading, endPoint: .trailing))
+        }
     }
 }
