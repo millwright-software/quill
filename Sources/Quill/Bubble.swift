@@ -15,10 +15,10 @@ final class Bubble {
         /// How far the tape has run, in points; a word's x is `width - (tape - word.start)`.
         @Published private(set) var tape: CGFloat = 0
 
-        static let width: CGFloat = 130                 // the last few words
-        static let font = NSFont.preferredFont(forTextStyle: .callout)
+        static let width: CGFloat = 110                 // the last few words
+        static let font = NSFont.systemFont(ofSize: 11)
         private static let space: CGFloat = 5
-        private static let speed: CGFloat = 60          // points per second, constant (Eric 10/31)
+        private static let speed: CGFloat = 50          // points per second, constant (Eric 10/31)
         private static let maxLag: CGFloat = 90         // words waiting beyond this are skipped, to stay current
 
         private var tapeEnd: CGFloat = 0
@@ -269,57 +269,59 @@ private struct BubbleView: View {
     }()
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 5) {
             // The feather writing: slowly back and forth along a faint baseline, tilting a little at
             // each turn. Driven by the clock, not implicit animation, so the layout never moves.
             TimelineView(.animation(paused: model.status != .listening)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let phase = model.status == .listening ? sin(t * 2 * .pi / 2.4) : 0   // one pass = 1.2 s
+                let ink = Color.white
                 ZStack(alignment: .bottomLeading) {
                     Capsule()
-                        .fill(.secondary.opacity(0.35))
-                        .frame(width: 30, height: 1.5)
-                        .offset(x: 2, y: -2)
+                        .fill(ink.opacity(0.18))
+                        .frame(width: 20, height: 1)
+                        .offset(x: 1, y: -1.5)
                     Self.feather
                         .resizable()
                         .renderingMode(.template)
-                        .foregroundStyle(.primary)
-                        .frame(width: 24, height: 24)
+                        .foregroundStyle(ink.opacity(0.8))
+                        .frame(width: 15, height: 15)
                         .rotationEffect(.degrees(-4 * cos(t * 2 * .pi / 2.4) * (model.status == .listening ? 1 : 0)),
                                         anchor: .bottomLeading)
-                        .offset(x: 4 + 6 * phase, y: -2)
+                        .offset(x: 3 + 4 * phase, y: -1.5)
                         .opacity(model.status == .transcribing ? 0.5 : 1)
                 }
-                .frame(width: 40, height: 28, alignment: .bottomLeading)
+                .frame(width: 26, height: 18, alignment: .bottomLeading)
             }
-            .frame(width: 40, height: 28)
+            .frame(width: 26, height: 18)
             stream
         }
-        .padding(.leading, 8)
-        .padding(.trailing, 14)
-        .padding(.vertical, 6)
-        .background(.regularMaterial, in: Capsule())
+        .padding(.leading, 7)
+        .padding(.trailing, 10)
+        .padding(.vertical, 4)
+        // A dark HUD in any appearance: subtle, never a white card.
+        .background(Color.black.opacity(0.55), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .environment(\.colorScheme, .dark)
         .overlay(
             Capsule().strokeBorder(
-                LinearGradient(colors: [Self.glow.opacity(0.9), Self.glow.opacity(0.35)],
+                LinearGradient(colors: [Color.white.opacity(0.22), Color.white.opacity(0.06)],
                                startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1.2)
+                lineWidth: 0.5)
         )
-        .shadow(color: Self.glow.opacity(0.55), radius: 8)
-        .shadow(color: Self.glow.opacity(0.25), radius: 16)
+        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
         .padding(Self.glowRoom)   // room inside the panel so the glow isn't clipped
     }
 
-    static let glow = Color(red: 0.55, green: 0.75, blue: 1)
-    static let glowRoom: CGFloat = 18
+    static let glowRoom: CGFloat = 10
 
     /// The tape: soft grey words entering at the right edge and fading out at the left.
     @ViewBuilder private var stream: some View {
         let width = Bubble.Model.width
         if model.status == .held {
             Text("Held, not pasted: Quill menu → Paste")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .font(Font(Bubble.Model.font))
+                .foregroundStyle(Color.white.opacity(0.6))
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
         } else {
@@ -331,8 +333,8 @@ private struct BubbleView: View {
                         .offset(x: width - (model.tape - word.start))
                 }
             }
-            .foregroundStyle(.secondary)
-            .frame(width: width, height: 20, alignment: .leading)
+            .foregroundStyle(Color.white.opacity(0.6))
+            .frame(width: width, height: 14, alignment: .leading)
             .clipped()
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0),
                                          .init(color: .black, location: 0.3),
