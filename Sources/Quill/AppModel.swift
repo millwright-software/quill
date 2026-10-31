@@ -9,15 +9,21 @@ enum QuillState: Equatable {
     case held        // transcript ready, but the target app lost focus: not pasted
     case failed(String)
 
-    var symbol: String {
+    /// The feather mark for this state, from Resources/menubar (drawn by scripts/make-icons.swift).
+    var iconName: String {
         switch self {
-        case .loading: "hourglass"
-        case .idle: "mic"
-        case .listening: "mic.fill"
-        case .transcribing: "ellipsis.circle"
-        case .held: "exclamationmark.bubble"
-        case .failed: "mic.slash"
+        case .loading, .idle: "quill-idle"
+        case .listening: "quill-listening"
+        case .transcribing: "quill-writing"
+        case .held: "quill-held"
+        case .failed: "quill-error"
         }
+    }
+
+    var menuBarImage: NSImage {
+        let image = NSImage(named: iconName) ?? NSImage(systemSymbolName: "mic", accessibilityDescription: "Quill")!
+        image.isTemplate = true
+        return image
     }
 
     var label: String {

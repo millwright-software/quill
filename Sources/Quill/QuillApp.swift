@@ -9,7 +9,7 @@ struct QuillApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(systemName: model.state.symbol)
+            Image(nsImage: model.state.menuBarImage)
         }
         .menuBarExtraStyle(.menu)
 

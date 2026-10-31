@@ -10,9 +10,10 @@ APP=build/Quill.app
 swift build -c release
 pkill -x Quill 2>/dev/null || true
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Quill "$APP/Contents/MacOS/Quill"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns Resources/menubar/*.png "$APP/Contents/Resources/"
 codesign --force --options runtime --timestamp=none \
   --entitlements Resources/Quill.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"
