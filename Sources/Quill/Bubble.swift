@@ -154,16 +154,23 @@ final class Bubble {
 
 private struct BubbleView: View {
     @ObservedObject var model: Bubble.Model
-    @State private var pulse = false
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 28, height: 28)
-                .scaleEffect(model.status == .listening && pulse ? 1.08 : 1)
-                .opacity(model.status == .transcribing ? 0.55 : 1)
-                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: pulse)
+            // Driven by the clock, not implicit animation, so nothing in the layout ever moves.
+            TimelineView(.animation(paused: model.status != .listening)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let listening = model.status == .listening
+                let glow = listening ? (sin(t * 2 * .pi / 1.6) + 1) / 2 : 0   // a slow breath
+                let nib = listening ? sin(t * 2 * .pi * 2.2) * 3 : 0           // a small writing stroke, in degrees
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                    .rotationEffect(.degrees(nib), anchor: .bottomLeading)
+                    .shadow(color: Color(red: 0.55, green: 0.75, blue: 1).opacity(0.35 + 0.5 * glow), radius: 2 + 5 * glow)
+                    .opacity(model.status == .transcribing ? 0.6 : 1)
+            }
+            .frame(width: 28, height: 28)
             if !line.isEmpty {
                 // One line; the newest words stay in view and older ones slide off the left.
                 Text(line)
@@ -177,7 +184,6 @@ private struct BubbleView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(.regularMaterial, in: Capsule())
-        .onAppear { pulse = true }
     }
 
     private var line: String {
