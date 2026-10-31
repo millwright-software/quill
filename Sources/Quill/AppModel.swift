@@ -44,6 +44,15 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(livePreview, forKey: "livePreview") }
     }
 
+    /// The held modifier that starts dictation; applied to the running monitor at once.
+    @Published var hotkeyKey = HotkeyKey.saved {
+        didSet {
+            UserDefaults.standard.set(hotkeyKey.rawValue, forKey: "hotkey")
+            hotkey?.key = hotkeyKey
+            Log.write("hotkey set to \(hotkeyKey.name)")
+        }
+    }
+
     /// The last clip, kept in memory until its transcript is pasted into the app it was meant for.
     private(set) var lastAudio: [Float]?
 
@@ -87,6 +96,7 @@ final class AppModel: ObservableObject {
         if Permissions.accessibility(prompt: false) {
             accessibilityTrusted = true
             let monitor = HotkeyMonitor()
+            monitor.key = hotkeyKey
             monitor.onPress = { [weak self] in self?.press() }
             monitor.onRelease = { [weak self] in self?.release() }
             monitor.onCancel = { [weak self] in self?.cancel() }
@@ -102,6 +112,12 @@ final class AppModel: ObservableObject {
                 self?.startHotkeyWhenTrusted()
             }
         }
+    }
+
+    /// Re-reads both permissions (the Settings window calls this while it is open).
+    func refreshPermissions() {
+        accessibilityTrusted = Permissions.accessibility(prompt: false)
+        microphoneGranted = Permissions.microphoneGranted()
     }
 
     // MARK: Hold to talk

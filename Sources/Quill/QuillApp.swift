@@ -12,11 +12,17 @@ struct QuillApp: App {
             Image(systemName: model.state.symbol)
         }
         .menuBarExtraStyle(.menu)
+
+        Window("Quill Settings", id: "settings") {
+            SettingsView(model: model)
+        }
+        .windowResizability(.contentSize)
     }
 }
 
 struct MenuContent: View {
     @ObservedObject var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Text(model.state.label)
@@ -41,7 +47,13 @@ struct MenuContent: View {
         if !model.microphoneGranted {
             Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
         }
-        Text("Hold Right Option to talk")
+        Text("Hold \(model.hotkeyKey.name) to talk")
+        Button("Settings…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "settings")
+        }
+        .keyboardShortcut(",")
+        Button("About Quill") { About.show() }
         Button("Open Log") { NSWorkspace.shared.open(Log.url) }
         Button("Quit Quill") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
