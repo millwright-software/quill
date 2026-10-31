@@ -9,7 +9,7 @@ struct QuillApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(nsImage: model.state.menuBarImage)
+            MenuBarIcon(model: model, meetings: model.meetings)
         }
         .menuBarExtraStyle(.menu)
 
@@ -17,6 +17,55 @@ struct QuillApp: App {
             SettingsView(model: model)
         }
         .windowResizability(.contentSize)
+    }
+}
+
+/// Dictation's state wins while it's active; otherwise a meeting shows: recording, then writing.
+struct MenuBarIcon: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var meetings: Meetings
+
+    var body: some View {
+        Image(nsImage: image)
+    }
+
+    private var image: NSImage {
+        let dictating = model.state == .listening || model.state == .transcribing || model.state == .held
+        if !dictating {
+            if meetings.isRecording, let mark = NSImage(systemSymbolName: "record.circle", accessibilityDescription: "Recording a meeting") {
+                mark.isTemplate = true
+                return mark
+            }
+            if meetings.isTranscribing { return QuillState.transcribing.menuBarImage }
+        }
+        return model.state.menuBarImage
+    }
+}
+
+/// The meeting section of the menu.
+struct MeetingMenu: View {
+    @ObservedObject var meetings: Meetings
+
+    var body: some View {
+        switch meetings.phase {
+        case .recording(let since):
+            Text("Recording meeting · \(Text(since, style: .timer))")
+            Button("Stop Meeting Recording") { meetings.stop() }
+        case .transcribing(let progress):
+            Text(progress)
+        case .failed(let why):
+            Text("Meeting: \(why)")
+            Button("Start Meeting Recording") { meetings.start() }
+        case .idle:
+            Button("Start Meeting Recording") { meetings.start() }
+        }
+        if !meetings.isRecording, !meetings.isTranscribing, meetings.lastFolder != nil, meetings.lastTranscript == nil {
+            Button("Transcribe Last Meeting") { meetings.transcribeLast() }
+        }
+        if meetings.lastTranscript != nil {
+            Button("Open Last Transcript") { meetings.openLastTranscript() }
+        }
+        Button("Open Meetings Folder") { meetings.openFolder() }
     }
 }
 
@@ -41,6 +90,8 @@ struct MenuContent: View {
         }
         Toggle("Live Preview While Talking", isOn: $model.livePreview)
         Divider()
+        MeetingMenu(meetings: model.meetings)
+        Divider()
         if !model.accessibilityTrusted {
             Button("Grant Accessibility…") { Permissions.openAccessibilitySettings() }
         }
@@ -55,7 +106,10 @@ struct MenuContent: View {
         .keyboardShortcut(",")
         Button("About Quill") { About.show() }
         Button("Open Log") { NSWorkspace.shared.open(Log.url) }
-        Button("Quit Quill") { NSApp.terminate(nil) }
+        Button("Quit Quill") {
+            if model.meetings.isRecording { model.meetings.stop() }   // never lose a meeting to Quit
+            NSApp.terminate(nil)
+        }
             .keyboardShortcut("q")
     }
 }

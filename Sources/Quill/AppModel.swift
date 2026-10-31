@@ -63,6 +63,7 @@ final class AppModel: ObservableObject {
     private(set) var lastAudio: [Float]?
 
     private let recorder = Recorder()
+    lazy var meetings = Meetings(recorder: recorder)
     private let bubble = Bubble()
     private var liveTask: Task<Void, Never>?
     private let transcriber = Transcriber()
