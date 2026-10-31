@@ -1,6 +1,7 @@
 #!/bin/bash
-# Build Quill.app into build/, signed with the Developer ID so macOS keeps the
-# Accessibility and Microphone grants across rebuilds. Usage: scripts/build.sh [--run]
+# Build Quill.app, signed with the Developer ID so macOS keeps the Accessibility and
+# Microphone grants across rebuilds, and install it as /Applications/Quill.app (the one copy,
+# so the login item can't find a stale one). Usage: scripts/build.sh [--run]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -17,8 +18,11 @@ cp Resources/AppIcon.icns Resources/quill-bubble.png Resources/menubar/*.png "$A
 codesign --force --options runtime --timestamp=none \
   --entitlements Resources/Quill.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"
-echo "built $APP"
+INSTALLED=/Applications/Quill.app
+rm -rf "$INSTALLED"
+mv "$APP" "$INSTALLED"
+echo "installed $INSTALLED"
 
 if [[ "${1:-}" == "--run" ]]; then
-  open -g "$APP"
+  open -g "$INSTALLED"
 fi

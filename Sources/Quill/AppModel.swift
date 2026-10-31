@@ -77,6 +77,7 @@ final class AppModel: ObservableObject {
     }
 
     private func start() async {
+        LoginItem.followMove()
         microphoneGranted = await Permissions.requestMicrophone()
         if microphoneGranted {
             do { try recorder.warmUp(); Log.write("mic warm") }
