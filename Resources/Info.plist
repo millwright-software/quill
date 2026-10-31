@@ -24,5 +24,7 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Quill listens only while you hold Right Option, and transcribes on this Mac.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Quill records your Mac's audio only while you record a meeting, and keeps it on this Mac.</string>
 </dict>
 </plist>
