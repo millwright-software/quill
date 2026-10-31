@@ -26,6 +26,7 @@ final class Bubble {
         self.panel = panel
         place(panel)
         panel.orderFrontRegardless()
+        resize()
     }
 
     func update(text: String) {
@@ -71,6 +72,11 @@ final class Bubble {
     }
 
     private func resize() {
+        // After SwiftUI has laid out the new text.
+        DispatchQueue.main.async { [weak self] in self?.fit() }
+    }
+
+    private func fit() {
         guard let panel, let view = panel.contentView else { return }
         let size = view.fittingSize
         var frame = panel.frame
@@ -148,40 +154,35 @@ final class Bubble {
 
 private struct BubbleView: View {
     @ObservedObject var model: Bubble.Model
+    @State private var pulse = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Circle().fill(dotColor).frame(width: 8, height: 8)
-                Text(header).font(.caption).foregroundStyle(.secondary)
-            }
-            if !model.text.isEmpty {
-                Text(model.text)
+        HStack(spacing: 8) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 28, height: 28)
+                .scaleEffect(model.status == .listening && pulse ? 1.08 : 1)
+                .opacity(model.status == .transcribing ? 0.55 : 1)
+                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: pulse)
+            if !line.isEmpty {
+                // One line; the newest words stay in view and older ones slide off the left.
+                Text(line)
                     .font(.callout)
-                    .lineLimit(3)
+                    .lineLimit(1)
                     .truncationMode(.head)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(model.status == .held ? .secondary : .primary)
+                    .frame(width: 380, alignment: .leading)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(width: 360, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: Capsule())
+        .onAppear { pulse = true }
     }
 
-    private var header: String {
-        switch model.status {
-        case .listening: "Listening → \(model.target)"
-        case .transcribing: "Writing → \(model.target)"
-        case .held: "Held: focus left \(model.target). Not pasted; Quill menu → Paste or Copy."
-        }
-    }
-
-    private var dotColor: Color {
-        switch model.status {
-        case .listening: .red
-        case .transcribing: .orange
-        case .held: .yellow
-        }
+    private var line: String {
+        model.status == .held
+            ? "Held: focus left \(model.target), not pasted. Quill menu → Paste or Copy."
+            : model.text
     }
 }
