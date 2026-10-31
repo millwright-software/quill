@@ -15,11 +15,13 @@ final class Bubble {
         /// How far the tape has run, in points; a word's x is `width - (tape - word.start)`.
         @Published private(set) var tape: CGFloat = 0
 
-        static let width: CGFloat = 380
+        static let width: CGFloat = 170                 // about the last three or four words
         static let font = NSFont.preferredFont(forTextStyle: .callout)
         private static let space: CGFloat = 5
-        private static let baseSpeed: CGFloat = 60      // points per second when nothing is waiting
-        private static let catchUp: CGFloat = 1.5       // extra speed per point of words still waiting
+        private static let baseSpeed: CGFloat = 45      // points per second when nothing is waiting
+        private static let catchUp: CGFloat = 1.0       // extra speed per point of words still waiting
+        private static let easing: CGFloat = 0.8        // seconds for the speed to settle; no lurches
+        private var speed: CGFloat = baseSpeed
 
         private var tapeEnd: CGFloat = 0
         private var emitted = 0
@@ -27,7 +29,7 @@ final class Bubble {
         private var nextID = 0
 
         func reset() {
-            words = []; tape = 0; tapeEnd = 0; emitted = 0; lastPartial = []
+            words = []; tape = 0; tapeEnd = 0; emitted = 0; lastPartial = []; speed = Self.baseSpeed
         }
 
         /// A new live pass: put on the tape the words this pass and the last one agree on.
@@ -60,7 +62,9 @@ final class Bubble {
 
         func advance(by seconds: CGFloat) {
             let waiting = max(0, tapeEnd - tape)
-            tape += (Self.baseSpeed + Self.catchUp * waiting) * seconds
+            let target = Self.baseSpeed + Self.catchUp * waiting
+            speed += (target - speed) * min(1, seconds / Self.easing)
+            tape += speed * seconds
             // Drop words well past the left edge.
             words.removeAll { Self.width - (tape - $0.start) < -200 }
         }
@@ -76,8 +80,8 @@ final class Bubble {
 
     private let model = Model()
     private var panel: NSPanel?
-    private var ticker: Timer?
-    private var lastTick = CACurrentMediaTime()
+    private var ticker: CADisplayLink?
+    private var tickTarget: TickTarget?
     private var hideTask: Task<Void, Never>?
 
     func show(target: String) {
@@ -85,12 +89,17 @@ final class Bubble {
         model.target = target
         model.reset()
         model.status = .listening
-        startTicker()
         let panel = self.panel ?? makePanel()
         self.panel = panel
         place(panel)
+        // Cut short a fade still running from the last dictation.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            panel.animator().alphaValue = 1
+        }
         panel.orderFrontRegardless()
         resize()
+        startTicker()   // needs the panel's view for its display link
     }
 
     func update(text: String) {
@@ -102,19 +111,15 @@ final class Bubble {
         model.flush()
     }
 
+    /// Steps the tape once per screen refresh (a timer drifts against the display and judders).
     private func startTicker() {
         ticker?.invalidate()
-        lastTick = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let now = CACurrentMediaTime()
-                self.model.advance(by: CGFloat(now - self.lastTick))
-                self.lastTick = now
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        ticker = timer
+        guard let view = panel?.contentView else { return }
+        let target = TickTarget { [weak self] seconds in self?.model.advance(by: seconds) }
+        let link = view.displayLink(target: target, selector: #selector(TickTarget.step(_:)))
+        link.add(to: .main, forMode: .common)
+        tickTarget = target
+        ticker = link
     }
 
     func held() {
@@ -123,14 +128,23 @@ final class Bubble {
         hide(after: .seconds(5))
     }
 
+    private static let fadeOut: TimeInterval = 0.6
+
     func hide(after delay: Duration = .zero) {
         hideTask?.cancel()
         hideTask = Task { [weak self] in
             if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled, let panel = self?.panel else { return }
+            // Fade out, the words still drifting, rather than vanish.
+            await NSAnimationContext.runAnimationGroup { context in
+                context.duration = Self.fadeOut
+                panel.animator().alphaValue = 0
+            }
             guard !Task.isCancelled else { return }
-            self?.panel?.orderOut(nil)
+            panel.orderOut(nil)
             self?.ticker?.invalidate()
             self?.ticker = nil
+            self?.tickTarget = nil
         }
     }
 
@@ -236,6 +250,20 @@ final class Bubble {
     }
 }
 
+/// The display link's target: hands each frame's elapsed time to the tape.
+private final class TickTarget: NSObject {
+    private let onStep: (CGFloat) -> Void
+    private var last: CFTimeInterval?
+
+    init(_ onStep: @escaping (CGFloat) -> Void) { self.onStep = onStep }
+
+    @objc func step(_ link: CADisplayLink) {
+        let now = link.targetTimestamp
+        if let last { MainActor.assumeIsolated { onStep(CGFloat(now - last)) } }
+        last = now
+    }
+}
+
 private struct BubbleView: View {
     @ObservedObject var model: Bubble.Model
 
@@ -293,7 +321,7 @@ private struct BubbleView: View {
     @ViewBuilder private var stream: some View {
         let width = Bubble.Model.width
         if model.status == .held {
-            Text("Held: focus left \(model.target), not pasted. Quill menu → Paste or Copy.")
+            Text("Held, not pasted: Quill menu → Paste")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
