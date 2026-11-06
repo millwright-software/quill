@@ -1,4 +1,5 @@
 import AVFoundation
+import ObjCGuard
 import FluidAudio
 
 /// Keeps the microphone warm with a short rolling pre-roll in memory, so a press starts with the
@@ -24,6 +25,9 @@ final class Recorder {
     private var fileFormat: AVAudioFormat?
     private var fileFailed = false
 
+    private var restartWork: DispatchWorkItem?
+    private var restartAttempt = 0
+
     /// Opens the mic and keeps it open. Restarts itself when the input device changes.
     func warmUp() throws {
         try startEngine()
@@ -31,18 +35,43 @@ final class Recorder {
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self] _ in
             Log.write("audio configuration changed; restarting the mic")
-            try? self?.startEngine()
+            self?.restartAttempt = 0
+            self?.scheduleRestart(after: 0.3)
         }
+    }
+
+    /// A device change arrives as a burst of notifications while the old device is still going away
+    /// (Bluetooth, sleep, a USB mic). Wait for it to settle, then retry until the mic comes back.
+    private func scheduleRestart(after delay: TimeInterval) {
+        restartWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            do {
+                try self.startEngine()
+                if self.restartAttempt > 0 { Log.write("mic back after \(self.restartAttempt) retries") }
+                self.restartAttempt = 0
+            } catch {
+                self.restartAttempt += 1
+                Log.write("mic restart failed (try \(self.restartAttempt)): \(error.localizedDescription)")
+                self.scheduleRestart(after: self.restartAttempt < 5 ? 0.5 : 3)
+            }
+        }
+        restartWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func startEngine() throws {
         engine.stop()
         let input = engine.inputNode
-        input.removeTap(onBus: 0)
+        var guardError: NSError?
+        _ = QuillTryObjC({ input.removeTap(onBus: 0) }, &guardError)
         let format = input.outputFormat(forBus: 0)
+        // Mid-change the input can report no channels or no rate; installing a tap then throws.
+        guard format.sampleRate > 0, format.channelCount > 0 else { throw RecorderError.noInput }
         lock.lock(); inputRate = format.sampleRate; preRoll.removeAll(); lock.unlock()
         updateFileConverter(for: format)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        guardError = nil
+        let installed = QuillTryObjC({ input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
             self.writeToFile(buffer)
             guard let channel = buffer.floatChannelData?[0] else { return }
@@ -56,7 +85,8 @@ final class Recorder {
                 if self.preRoll.count > keep { self.preRoll.removeFirst(self.preRoll.count - keep) }
             }
             self.lock.unlock()
-        }
+        } }, &guardError)
+        guard installed else { throw RecorderError.tap(guardError?.localizedDescription ?? "unknown") }
         engine.prepare()
         try engine.start()
     }
@@ -160,6 +190,18 @@ final class Recorder {
         } catch {
             fileFailed = true
             Log.write("mic file write failed, file stops here: \(error.localizedDescription)")
+        }
+    }
+}
+
+enum RecorderError: LocalizedError {
+    case noInput
+    case tap(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .noInput: "no microphone input right now"
+        case .tap(let why): "couldn't open the mic: \(why)"
         }
     }
 }
