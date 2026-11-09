@@ -5,7 +5,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-IDENTITY="Developer ID Application: Eric Richey (EP5JCD9CKW)"
+# Eric's Developer ID when this Mac has it (grants survive rebuilds); otherwise ad-hoc signing,
+# which runs fine but makes macOS ask for Microphone and Accessibility again after each rebuild.
+IDENTITY="${QUILL_SIGN_IDENTITY:-Developer ID Application: Eric Richey (EP5JCD9CKW)}"
+if ! security find-identity -v -p codesigning | grep -qF "$IDENTITY"; then
+  echo "signing identity not found; signing ad-hoc"
+  IDENTITY="-"
+fi
 APP=build/Quill.app
 
 swift build -c release
