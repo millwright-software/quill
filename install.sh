@@ -3,7 +3,7 @@
 #   Private repo (needs the GitHub CLI, logged in):
 #     gh api repos/millwright-software/quill/contents/install.sh --jq .content | base64 -d | bash
 #   Public repo:
-#     curl -fsSL https://raw.githubusercontent.com/millwright-software/quill/main/install.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/millwright-software/quill/master/install.sh | bash
 set -euo pipefail
 REPO=millwright-software/quill
 TMP=$(mktemp -d)
