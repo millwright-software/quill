@@ -9,7 +9,18 @@ Two features, the two he actually uses in MacWhisper (Eric, 10/30):
 
 Nothing else until those two feel better than MacWhisper.
 
-## Install on a Mac
+## Install on a Mac without Xcode
+
+Install the latest release (signed and notarized), from the repo's GitHub releases:
+
+```sh
+# private repo: needs the GitHub CLI, logged in (brew install gh; gh auth login)
+gh api repos/millwright-software/quill/contents/install.sh --jq .content | base64 -d | bash
+```
+
+To publish one (Eric's Mac, which has the Developer ID and the notary login): `scripts/release.sh 0.3.1`. The one-time setup is at the top of that script.
+
+## Build from source
 
 Needs an Apple Silicon Mac on macOS 15+, and Xcode 26 (Swift 6.2).
 
