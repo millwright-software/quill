@@ -1,8 +1,8 @@
 # Quill
 
-A small macOS menu-bar app for Eric: speak, and the words land as text. Local and private: audio never leaves the Mac.
+A small macOS menu-bar app: speak, and the words land as text. Local and private: audio never leaves the Mac.
 
-Two features, the two he actually uses in MacWhisper (Eric, 10/30):
+Two features, the two most used in MacWhisper:
 
 1. **Hold to talk.** Hold a modifier key (option or command), speak, let go: the transcript is pasted wherever the cursor is, in any app.
 2. **Record, then transcribe.** Press record, stop, transcribe the recording. Save or copy the text.
@@ -41,3 +41,7 @@ The first build fetches the Swift packages (FluidAudio, WhisperKit). Nothing els
 Models live in `~/Library/Application Support/` (FluidAudio, Quill/Models). Dictation audio never touches disk; meetings save to `~/Desktop/Quill Meetings/`.
 
 Status: v0.3 in daily use: hold-to-talk dictation with a live bubble at the cursor, and meeting recording with Whisper transcription. See `CLAUDE.md` for the brief and decisions, `IDEAS.md` for the running list.
+
+## License
+
+MIT (see `LICENSE`). Speech models: NVIDIA Parakeet TDT 0.6B v2 (CC-BY-4.0) via FluidAudio (Apache-2.0); Whisper Large v3 Turbo via WhisperKit (MIT). System-audio capture adapted from humanitas-labs/quill (MIT).

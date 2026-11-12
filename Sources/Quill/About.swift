@@ -8,7 +8,7 @@ enum About {
     /// The standard About panel, brought to the front.
     static func show() {
         let credits = """
-        Local dictation for Eric. Speech: NVIDIA Parakeet TDT 0.6B v2 (CC-BY-4.0) via FluidAudio (Apache-2.0). Audio never leaves this Mac.
+        Local dictation for macOS. Speech: NVIDIA Parakeet TDT 0.6B v2 (CC-BY-4.0) via FluidAudio (Apache-2.0). Audio never leaves this Mac.
 
         a feather you write with: bird into words.
         """
