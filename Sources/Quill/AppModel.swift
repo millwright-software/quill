@@ -81,6 +81,7 @@ final class AppModel: ObservableObject {
         LoginItem.followMove()
         microphoneGranted = await Permissions.requestMicrophone()
         if microphoneGranted {
+            bubble.levelSource = { [recorder] in recorder.level }
             do { try recorder.warmUp(); Log.write("mic warm") }
             catch { Log.write("mic warm-up failed: \(error)") }
         }

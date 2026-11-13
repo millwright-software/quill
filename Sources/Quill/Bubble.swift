@@ -14,6 +14,14 @@ final class Bubble {
         @Published private(set) var words: [Word] = []
         /// How far the tape has run, in points; a word's x is `width - (tape - word.start)`.
         @Published private(set) var tape: CGFloat = 0
+        /// The mic level, smoothed: rises fast with the voice, settles slowly.
+        @Published private(set) var glow: CGFloat = 0
+
+        func follow(level: CGFloat, over seconds: CGFloat) {
+            let target = status == .listening ? level : 0
+            let rate: CGFloat = target > glow ? 18 : 4
+            glow += (target - glow) * min(1, rate * seconds)
+        }
 
         static let width: CGFloat = 110                 // the last few words
         static let font = NSFont.systemFont(ofSize: 11)
@@ -73,6 +81,8 @@ final class Bubble {
     enum Status { case listening, transcribing, held }
 
     private let model = Model()
+    /// The mic level, read once per frame while the bubble is up.
+    var levelSource: (() -> Float)?
     private var panel: NSPanel?
     private var ticker: CADisplayLink?
     private var tickTarget: TickTarget?
@@ -110,7 +120,11 @@ final class Bubble {
     private func startTicker() {
         ticker?.invalidate()
         guard let view = panel?.contentView else { return }
-        let target = TickTarget { [weak self] seconds in self?.model.advance(by: seconds) }
+        let target = TickTarget { [weak self] seconds in
+            guard let self else { return }
+            self.model.advance(by: seconds)
+            self.model.follow(level: CGFloat(self.levelSource?() ?? 0), over: seconds)
+        }
         let link = view.displayLink(target: target, selector: #selector(TickTarget.step(_:)))
         link.add(to: .main, forMode: .common)
         tickTarget = target
@@ -309,11 +323,17 @@ private struct BubbleView: View {
                                startPoint: .topLeading, endPoint: .bottomTrailing),
                 lineWidth: 0.5)
         )
+        .overlay(
+            Capsule().strokeBorder(Self.glowColor.opacity(0.15 + 0.6 * model.glow), lineWidth: 0.5 + 0.7 * model.glow)
+        )
         .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+        // A soft warm glow that follows the voice, so the bubble is easy to find while talking.
+        .shadow(color: Self.glowColor.opacity(0.1 + 0.55 * model.glow), radius: 3 + 9 * model.glow)
         .padding(Self.glowRoom)   // room inside the panel so the glow isn't clipped
     }
 
-    static let glowRoom: CGFloat = 10
+    static let glowRoom: CGFloat = 16
+    static let glowColor = Color(red: 1.0, green: 0.88, blue: 0.62)   // warm white, a hint of candle
 
     /// The tape: soft grey words entering at the right edge and fading out at the left.
     @ViewBuilder private var stream: some View {

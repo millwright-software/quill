@@ -18,6 +18,15 @@ final class Recorder {
     private var inputRate: Double = 48_000
     private let converter = AudioConverter(sampleRate: Recorder.sampleRate)
     private var configObserver: NSObjectProtocol?
+    private var rms: Float = 0
+
+    /// How loud the mic is right now, 0…1 (about -50 dB to -15 dB), for the bubble's glow.
+    var level: Float {
+        lock.lock(); let r = rms; lock.unlock()
+        guard r > 0 else { return 0 }
+        let db = 20 * log10(r)
+        return min(1, max(0, (db + 50) / 35))
+    }
     // Meeting file: written from the tap thread, guarded by its own lock so dictation is never held up.
     private let fileLock = NSLock()
     private var file: AVAudioFile?
@@ -76,7 +85,10 @@ final class Recorder {
             self.writeToFile(buffer)
             guard let channel = buffer.floatChannelData?[0] else { return }
             let chunk = UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))
+            var sum: Float = 0
+            for x in chunk { sum += x * x }
             self.lock.lock()
+            self.rms = chunk.isEmpty ? 0 : (sum / Float(chunk.count)).squareRoot()
             if self.capturing {
                 self.samples.append(contentsOf: chunk)
             } else {
