@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3 (2026-11-18)
+
+- Fixed a crash when opening the menu-bar menu (the menu could rebuild itself while opening until the app ran out of stack). The meeting line in the menu shows the start time instead of a live timer.
+
 ## 0.4.2 (2026-11-15)
 
 - The welcome window and Settings say plainly that Quill listens only while the feather is red.
