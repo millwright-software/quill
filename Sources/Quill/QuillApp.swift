@@ -3,7 +3,10 @@ import SwiftUI
 
 @main
 struct QuillApp: App {
-    @StateObject private var model = AppModel()
+    // @State, not @StateObject: the views below observe the model themselves. Observing it here
+    // re-evaluated the scenes on every change, which reconfigured the MenuBarExtra while its
+    // menu was open and could recurse until the main thread's stack ran out (crash 11/17).
+    @State private var model = AppModel()
 
     var body: some Scene {
         MenuBarExtra {
@@ -57,7 +60,8 @@ struct MeetingMenu: View {
     var body: some View {
         switch meetings.phase {
         case .recording(let since):
-            Text("Recording meeting · \(Text(since, style: .timer))")
+            // A start time, not a live timer: a ticking Text rebuilds the open menu every second.
+            Text("Recording meeting since \(since, style: .time)")
             if let note = meetings.statusText { Text(note) }
             Button("Stop Meeting Recording") { meetings.stop() }
         case .transcribing(let progress):
